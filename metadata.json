@@ -1,0 +1,10 @@
+{
+  "name": "Enkel Ljudinspelare",
+  "description": "Spela in ljud från datorns mikrofon lokalt och spara direkt som MP3. 100% privat och GDPR-säkert.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
