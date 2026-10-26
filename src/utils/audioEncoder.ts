@@ -183,3 +183,90 @@ export function triggerDownload(blob: Blob, filename: string): void {
     URL.revokeObjectURL(url);
   }, 200);
 }
+
+export interface NormalizationResult {
+  normalizedBuffer: AudioBuffer;
+  originalPeak: number;
+  originalPeakDb: number;
+  targetPeak: number;
+  gainFactor: number;
+  gainDb: number;
+  wasBoosted: boolean;
+}
+
+/**
+ * Scans an AudioBuffer for maximum absolute peak amplitude across all channels.
+ */
+export function getAudioBufferPeak(buffer: AudioBuffer): number {
+  let maxPeak = 0;
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const data = buffer.getChannelData(c);
+    for (let i = 0; i < data.length; i++) {
+      const abs = Math.abs(data[i]);
+      if (abs > maxPeak) {
+        maxPeak = abs;
+      }
+    }
+  }
+  return maxPeak;
+}
+
+/**
+ * Normalizes an AudioBuffer to an optimal target peak without clipping.
+ * Default targetPeak is 0.95 (approx -0.45 dBFS) to preserve headroom for MP3 encoding.
+ */
+export function normalizeAudioBuffer(
+  buffer: AudioBuffer,
+  targetPeak = 0.95
+): NormalizationResult {
+  const AudioCtx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const ctx = new AudioCtx();
+
+  const originalPeak = getAudioBufferPeak(buffer);
+  const originalPeakDb = originalPeak > 0.0001 ? 20 * Math.log10(originalPeak) : -60;
+
+  // If buffer is virtually silent or already at or above target, no boost needed
+  if (originalPeak < 0.0001 || originalPeak >= targetPeak) {
+    return {
+      normalizedBuffer: buffer,
+      originalPeak,
+      originalPeakDb,
+      targetPeak,
+      gainFactor: 1.0,
+      gainDb: 0,
+      wasBoosted: false,
+    };
+  }
+
+  const gainFactor = targetPeak / originalPeak;
+  const gainDb = 20 * Math.log10(gainFactor);
+
+  // Create a new AudioBuffer with normalized sample data
+  const normalizedBuffer = ctx.createBuffer(
+    buffer.numberOfChannels,
+    buffer.length,
+    buffer.sampleRate
+  );
+
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const src = buffer.getChannelData(c);
+    const dst = normalizedBuffer.getChannelData(c);
+    for (let i = 0; i < src.length; i++) {
+      // Multiply by gainFactor and clamp safely between -1.0 and 1.0 to prevent distortion
+      const val = src[i] * gainFactor;
+      dst[i] = Math.max(-1.0, Math.min(1.0, val));
+    }
+  }
+
+  return {
+    normalizedBuffer,
+    originalPeak,
+    originalPeakDb,
+    targetPeak,
+    gainFactor,
+    gainDb,
+    wasBoosted: true,
+  };
+}

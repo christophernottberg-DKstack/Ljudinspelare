@@ -28,6 +28,7 @@ export interface AudioRecorderHook {
   resumeRecording: () => void;
   stopRecording: () => Promise<void>;
   resetRecording: () => void;
+  loadAudioBuffer: (buffer: AudioBuffer, blob?: Blob) => void;
   setAutoGain: (enabled: boolean) => void;
   setNoiseSuppression: (enabled: boolean) => void;
   setManualGain: (gain: number) => void;
@@ -368,6 +369,15 @@ export function useAudioRecorder(): AudioRecorderHook {
 
   const clearError = () => setError(null);
 
+  const loadAudioBuffer = (buffer: AudioBuffer, blob?: Blob) => {
+    cleanupStream();
+    setAudioBuffer(buffer);
+    if (blob) setRecordedBlob(blob);
+    setRecordingTime(buffer.duration);
+    setStatus('ready');
+    setError(null);
+  };
+
   return {
     status,
     recordingTime,
@@ -387,6 +397,7 @@ export function useAudioRecorder(): AudioRecorderHook {
     resumeRecording,
     stopRecording,
     resetRecording,
+    loadAudioBuffer,
     setAutoGain,
     setNoiseSuppression,
     setManualGain,
